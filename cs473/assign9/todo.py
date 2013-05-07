@@ -14,50 +14,48 @@ def todo_list():
     
 @route('/new', method='GET')
 def new_item():
+    return template('new_task.tpl')
 
-    if request.GET.get('save','').strip():
+@route('/new', method='POST')
+def new_item():
+    new = request.POST.get('task', '').strip()
+    conn = sqlite3.connect('todo.db')
+    c = conn.cursor()
 
-        new = request.GET.get('task', '').strip()
-        conn = sqlite3.connect('todo.db')
-        c = conn.cursor()
+    c.execute("INSERT INTO todo (task,status) VALUES (?,?)", (new,1))
+    new_id = c.lastrowid
 
-        c.execute("INSERT INTO todo (task,status) VALUES (?,?)", (new,1))
-        new_id = c.lastrowid
+    conn.commit()
+    c.close()
+    return '<p>The new task was inserted into the database, the ID is %s</p>' % new_id
+    
 
-        conn.commit()
-        c.close()
+@route('/edit/:no', method='POST')
+@validate(no=int)
+def edit_item(no):
+    edit = request.POST.get('task','').strip()
+    status = request.POST.get('status','').strip()
 
-        return '<p>The new task was inserted into the database, the ID is %s</p>' % new_id
+    if status == 'open':
+        status = 1
     else:
-        return template('new_task.tpl')
+        status = 0
 
+    conn = sqlite3.connect('todo.db')
+    c = conn.cursor()
+    c.execute("UPDATE todo SET task = ?, status = ? WHERE id LIKE ?", (edit, status, no))
+    conn.commit()
 
+    return '<p>The item number %s was successfully updated</p>' % no
+        
 @route('/edit/:no', method='GET')
 @validate(no=int)
 def edit_item(no):
-
-    if request.GET.get('save','').strip():
-        edit = request.GET.get('task','').strip()
-        status = request.GET.get('status','').strip()
-
-        if status == 'open':
-            status = 1
-        else:
-            status = 0
-
-        conn = sqlite3.connect('todo.db')
-        c = conn.cursor()
-        c.execute("UPDATE todo SET task = ?, status = ? WHERE id LIKE ?", (edit, status, no))
-        conn.commit()
-
-        return '<p>The item number %s was successfully updated</p>' % no
-    else:
-        conn = sqlite3.connect('todo.db')
-        c = conn.cursor()
-        c.execute("SELECT task FROM todo WHERE id LIKE ?", (str(no)))
-        cur_data = c.fetchone()
-
-        return template('edit_task', old=cur_data, no=no)
+    conn = sqlite3.connect('todo.db')
+    c = conn.cursor()
+    c.execute("SELECT task FROM todo WHERE id LIKE ?", (str(no)))
+    cur_data = c.fetchone()
+    return template('edit_task', old=cur_data, no=no)
 
 @route('/item:item#[1-9]+#')
 def show_item(item):
